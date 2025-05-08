@@ -1,0 +1,124 @@
+ <!DOCTYPE html>
+ <html lang="zh-Hant">
+ <head>
+     <meta charset="UTF-8">
+     <title>智慧垃圾桶監控頁面</title>
+     <style>
+         body {
+             font-family: Arial, sans-serif;
+             text-align: center;
+             padding: 20px;
+         }
+         h1 {
+             margin-bottom: 40px;
+         }
+         .section {
+             margin-bottom: 30px;
+         }
+         .status {
+             font-size: 24px;
+             margin-top: 10px;
+         }
+     </style>
+ </head>
+ <body>
+
+     <h1>智慧垃圾桶即時監控</h1>
+
+     <div class="section">
+         <h2>CO濃度偵測</h2>
+         <div id="coStatus" class="status">載入中...</div>
+         <div id="coValue" class="status"></div>
+     </div>
+
+     <div id="dangerWarning" class="status" style="font-size: 20px; color: red;"></div>
+
+
+     <div class="section">
+         <h2>垃圾桶狀態</h2>
+         <div id="tcrtStatus" class="status">載入中...</div>
+     </div>
+
+	<div class="section">
+    	<h2>蓋子狀態</h2>
+    	<div id="lidStatus" class="status">載入中...</div>
+	</div>
+
+
+     <script>
+        function updateData() {
+          fetch('/api/co')
+            .then(response => response.json())
+            .then(data => {
+              // === 顯示 CO 狀態（圖示＋顏色）
+              const statusEl = document.getElementById('coStatus');
+              if (data.status === "ALERT") {
+                statusEl.innerHTML = "<span style='color:red;'>⚠️ CO濃度過高！</span>";
+              } else {
+                statusEl.innerHTML = "<span style='color:green;'>✅ CO濃度正常</span>";
+              }
+        
+              // === 每秒更新 ppm 與 更新時間（不論是否超標）
+              const valueEl = document.getElementById('coValue');
+              const updateTime = new Date(data.updated_at * 1000);
+              const formattedTime = updateTime.toLocaleString('zh-TW');
+              valueEl.innerHTML = `
+                目前濃度數值：${data.value} ppm<br>
+                <span style="font-size:12px; color:gray;">更新時間：${formattedTime}</span>
+              `;
+        
+              // === 危險提示 DANGER（如果出現才顯示）
+              const warnEl = document.getElementById('dangerWarning');
+              if (data.danger === true) {
+                warnEl.innerHTML = "🚨🚨🚨 持續超標超過 60 秒！請立即檢查環境！🚨🚨🚨";
+              } else {
+                warnEl.innerHTML = ""; // ←✅ 恢復正常就清除警告
+              }
+            })
+            .catch(error => {
+              console.error('Error fetching CO data:', error);
+            });
+        
+          // === 讀垃圾桶 TCRT 狀態 ===
+          fetch('/api/tcrt')
+            .then(response => response.json())
+            .then(data => {
+              const tcrtEl = document.getElementById('tcrtStatus');
+
+			if (data.status === "INACTIVE") {
+				tcrtEl.innerHTML = "<span style='color:gray;'>⚠️ 感測器程式未啟動</span>";
+			} else if (data.status === "FULL") {
+				tcrtEl.innerHTML = "<span style='color:red;'>🛑 垃圾桶已滿！</span>";
+			} else {
+				tcrtEl.innerHTML = "<span style='color:green;'>✅ 垃圾桶未滿</span>";
+			}
+
+            })
+            .catch(error => {
+              console.error('Error fetching TCRT data:', error);
+            });
+
+		// === 讀蓋子狀態 ===
+		fetch('/status/lid_status.txt')
+		    .then(response => response.text())
+		    .then(data => {
+		        const [status, ts] = data.trim().split('\n');
+		        const lidEl = document.getElementById('lidStatus');
+		        if (status === 'open') {
+		            lidEl.innerHTML = "<span style='color:blue;'>🔓 蓋子開啟中</span>";
+		        } else {
+		            lidEl.innerHTML = "<span style='color:black;'>🔒 蓋子已關閉</span>";
+		        }
+		    });
+
+        }
+        
+        setInterval(updateData, 1000);
+        updateData();
+        </script>
+        
+
+ </body>
+ </html>
+
+
